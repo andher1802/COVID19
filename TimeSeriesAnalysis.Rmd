@@ -260,13 +260,13 @@ axis(1, at = 1:length(dates), labels =dates, las=2, cex.axis=0.7)
 
 ```
 
-Blue areas are time periods where the p-value of the trending change resulted in significant results. pvalues (blue areas difference with the xaxis) are measured between 0 and 100. We usually accepr as significant p-value < 0.005 (0.5 in the chart).
+Blue areas are time periods where the p-value of the trending change resulted in significant results. We usually accept as significant p-value < 0.005.
 
 
 ```{r summary}
 
-Country
-modelbest_ind_report[24]
-dates_resample[24]
+# Country
+# modelbest_ind_report[24]
+# dates_resample[24]
 
 ```
