@@ -3,7 +3,7 @@ title: "Time series analysis for COVID19 Cases Trends by Country"
 author: Andres Hernandez
 date: "04/02/2020"
 output:
-  html_document: default
+  html_document: default    
   word_document: default
   pdf_document: default
 ---
@@ -45,7 +45,7 @@ Analysis in trending changes is conducted using the causal analysis library. Mor
 Analysis is conducted over the discrete derivative of the logarithmic of the ratio between the cumulative confirmed cases vs. the total testing, as cases are exponentially distributed the log will result in the linear trend and the derivative will show the pendent. The time series will analyze increasing or decreasing trends on the pendent of the exponential growth rate.
 
 ```{r processing, include=TRUE, warning=FALSE}
-Country <- "Italy" # Select the country
+Country <- "Belgium" # Select the country
 ResultsByCountry <- result[[Country]] 
 CountryNamesList <- strsplit(as.character(testing$Entity), " - ")
 CountryName <- c()
@@ -54,7 +54,7 @@ for (element in CountryNamesList){
 }
 testing$Country <- CountryName
 
-TestByCountry <- testing[testing$Country == "Italy",] # select country (pendent for creating a 
+TestByCountry <- testing[testing$Country == "Belgium",] # select country (pendent for creating a 
 TestByCountry$TestDate <- as.Date(TestByCountry$Date,format='%B %d, %Y')
 TestByCountry$DailyTest <- c(TestByCountry$Cumulative.total.tests[1],diff(TestByCountry$Cumulative.total.tests))
 
@@ -129,13 +129,14 @@ for (element in seq(startint, endint - 2 * interval, 1)){
   impact <- CausalImpact(data_scaled, pre.period, post.period)
   pvalue <- impact$summary$p[1]
   if(is.null(pvalue)){
-    pvaluesig2_ind <- c(pvaluesig2_ind, 1)    
+    pvaluesig2_ind <- c(pvaluesig2_ind, 1)
+    modelbest_ind_report[length(modelbest_ind_report)+1] <- NA
   } else {
     pvaluesig2_ind <- c(pvaluesig2_ind, pvalue)
+    modelbest_ind_report[length(modelbest_ind_report)+1] <- impact$report
   }
   pvaluesig_ind <- c(pvaluesig_ind, testperiod)
   # modelbest_ind[length(modelbest_ind)+1] <- impact
-  # modelbest_ind_report[length(modelbest_ind_report)+1] <- impact$report
 }
 
 p_value_area <- c()
@@ -181,7 +182,7 @@ points(
   cex=1,
 )
 abline(
-  v=24.5,
+  v=28,
   col="purple",
   pch=18,
   lwd=2,
@@ -200,7 +201,7 @@ axis(
   at = seq(0,topval, scale), 
   labels = seq(0,max(cumsum(testtsint_resample)), max(cumsum(testtsint_resample))/length(seq(0,topval, scale)))[1:length(seq(0,topval, scale))], 
   las=2,
-  cex.axis=0.5
+  cex.axis=0.3
   )
 legend(
   "topleft", 
@@ -256,6 +257,16 @@ plot(
   xlab = ""
   )
 axis(1, at = 1:length(dates), labels =dates, las=2, cex.axis=0.7)
+
 ```
 
 Blue areas are time periods where the p-value of the trending change resulted in significant results. pvalues (blue areas difference with the xaxis) are measured between 0 and 100. We usually accepr as significant p-value < 0.005 (0.5 in the chart).
+
+
+```{r summary}
+
+Country
+modelbest_ind_report[24]
+dates_resample[24]
+
+```
