@@ -13,7 +13,7 @@ library(rjson)
 library(CausalImpact)
 library(TTR)
 library(imputeTS)
-setwd("~/Documents/Projects/Coronavirus/COVID19/")
+setwd("~/Documents/Projects/Coronavirus/GITCOVID19/COVID19")
 graphics.off()
 ```
 
