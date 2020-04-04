@@ -1,0 +1,258 @@
+---
+title: "Time series analysis for COVID19 Cases Trends by Country"
+author: Andres Hernandez
+date: "04/02/2020"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(rjson)
+library(CausalImpact)
+library(TTR)
+library(imputeTS)
+setwd("~/Documents/Projects/Coronavirus/COVID19/")
+graphics.off()
+```
+
+## Data Sources
+Data for COVID19 updated until April 1st, 2020 comes from [COVID19-TIMESERIES](https://pomber.github.io/covid19/timeseries.json).
+
+Data for Daily testing from [COVID19-TESTING](https://ourworldindata.org/covid-testing)
+[COVID19-TESTING-Sources](https://ourworldindata.org/covid-testing#source-information-country-by-country)
+
+```{r load, include=FALSE}
+result <- fromJSON(file = "timeseries2.json") # data from the COVID19
+testing <- read.csv("covid19test.csv", header = TRUE)
+```
+
+## Processing the data
+
+Data is read by country, change the country for the country of your interest. Then n and interval parameters are used for aggregating data and set the interval of analysis for the time trend. 
+
+n is the aggregation parameter in days, if we set n to 7 we sample cases each week. 
+
+interval parametes choose the number of time periods to take into account for the trending change analysis. (If we select n = 5, interval = 2, it means that the trending change will take into account 10 days before and after to analyze if there was a change in the trending).
+
+Analysis in trending changes is conducted using the causal analysis library. More information about this library refer to the link below. 
+[Causal Impact](https://research.google/pubs/pub41854/)
+[Paper](https://projecteuclid.org/download/pdfview_1/euclid.aoas/1430226092)
+
+Analysis is conducted over the discrete derivative of the log(cases), as cases are exponentially distributed the log will result in the linear trend and the derivative will show the pendent. The time series will analyze increasing or decreasing trends on the pendent of the exponential growth rate.
+
+```{r processing, include=TRUE, warning=FALSE}
+Country <- "Italy" # Select the country
+ResultsByCountry <- result[[Country]] 
+CountryNamesList <- strsplit(as.character(testing$Entity), " - ")
+CountryName <- c()
+for (element in CountryNamesList){
+  CountryName <- c(CountryName, element[1])
+}
+testing$Country <- CountryName
+
+TestByCountry <- testing[testing$Country == "Italy",] # select country (pendent for creating a 
+TestByCountry$TestDate <- as.Date(TestByCountry$Date,format='%B %d, %Y')
+TestByCountry$DailyTest <- c(TestByCountry$Cumulative.total.tests[1],diff(TestByCountry$Cumulative.total.tests))
+
+dates <- c()
+deaths <- c()
+recovered <- c()
+confirmed <- c()
+tests <- c()
+
+for(element in ResultsByCountry){
+  currentDate <- as.Date(element$date)
+  dates <- c(dates, as.character(currentDate))
+  deaths <- c(deaths, element$deaths)
+  recovered <- c(recovered, element$recovered)
+  confirmed <- c(confirmed, element$confirmed)
+
+  if(currentDate %in% TestByCountry$TestDate){
+    if (TestByCountry[TestByCountry$TestDate==currentDate,]$DailyTest == 0){
+      tests <- c(tests, NA)  
+    } else {
+      tests <- c(tests, TestByCountry[TestByCountry$TestDate==currentDate,]$DailyTest)  
+    }
+  } else {
+    tests <- c(tests, NA)
+  }
+}
+
+testts <- ts(tests)
+if(is.na(testts[1])){
+  testts[1]=0
+}
+testtsint <- na.interpolation(testts)
+testtsint[testtsint==0]<-1
+cumulated <- confirmed/cumsum(testtsint)
+
+CasesAdjusted <- cumulated # Select between confirmed, recovered, deaths, cumulated
+timeseries_Real_T <- ts(CasesAdjusted, start = 1, end = length(CasesAdjusted))
+
+n <- 2
+interval <- 3
+
+dates_resample <- dates[seq(1, length(dates)-n, n)]
+
+timeseries_resample <- timeseries_Real_T[seq(1,length(timeseries_Real_T)-n, n)]
+testtsint_resample <- testtsint[seq(1,length(testtsint)-n, n)]
+
+# timeseries_resample <- timeseries_resample / testtsint_resample
+
+timeseries_resample_log <- log(timeseries_resample+1)
+testtsint_resample_log <- log(testtsint_resample+1)
+
+dataSMA <- SMA(timeseries_resample_log,n=4)
+data <- diff(dataSMA)
+
+datatestingSMA <- SMA(testtsint_resample_log,n=4)
+datatesting <- diff(datatestingSMA)
+
+data_scaled <- data
+
+startint <- 1
+endint <- length(data_scaled)
+
+pvaluesig_ind <- c()
+pvaluesig2_ind <- c()
+modelbest_ind <- c()
+modelbest_ind_report <- c()
+
+for (element in seq(startint, endint - 2 * interval, 1)){
+  testperiod <- element + interval
+  pre.period <- c(testperiod-interval, testperiod)
+  post.period <- c(testperiod+1, testperiod+interval)
+  impact <- CausalImpact(data_scaled, pre.period, post.period)
+  pvalue <- impact$summary$p[1]
+  if(is.null(pvalue)){
+    pvaluesig2_ind <- c(pvaluesig2_ind, 1)    
+  } else {
+    pvaluesig2_ind <- c(pvaluesig2_ind, pvalue)
+  }
+  pvaluesig_ind <- c(pvaluesig_ind, testperiod)
+  # modelbest_ind[length(modelbest_ind)+1] <- impact
+  # modelbest_ind_report[length(modelbest_ind_report)+1] <- impact$report
+}
+
+p_value_area <- c()
+for (element in pvaluesig2_ind){
+  if(element < 0.005){
+    p_value_area <- c(p_value_area, 1000)
+  } else {
+    p_value_area <- c(p_value_area, 0)
+  }
+}
+```
+
+## Plotting results
+
+```{r plot, include=TRUE}
+# topval <- max(timeseries_resample)
+topval <- 0.3
+par(mfrow=c(3,1))
+plot(
+  1:length(timeseries_resample), 
+  timeseries_resample, 
+  type = "o",
+  col="black",
+  pch=18,
+  lwd=2,
+  lty=1,
+  cex=1,
+  xaxt="n",
+  xlab="",
+  ylab = "confirmed cases",
+  ylim = c(0, topval)
+)
+polygon(pvaluesig_ind, p_value_area*10**10, col=c("#0C92C255","black"), border=1)
+points(
+  1:length(testtsint_resample), 
+  cumsum(testtsint_resample)*(topval/max(cumsum(testtsint_resample))),
+  type = "o",
+  col="red",
+  pch=18,
+  lwd=2,
+  lty=1,
+  cex=1,
+)
+abline(
+  v=20,
+  col="purple",
+  pch=18,
+  lwd=2,
+  lty=1
+)
+axis(
+  1, 
+  at = 1:length(data), 
+  labels = dates_resample[-1], 
+  las=2,
+  cex.axis=0.7
+  )
+scale <- 0.05
+axis(
+  4, 
+  at = seq(0,topval, scale), 
+  labels = seq(0,max(cumsum(testtsint_resample)), max(cumsum(testtsint_resample))/length(seq(0,topval, scale)))[1:length(seq(0,topval, scale))], 
+  las=2,
+  cex.axis=0.5
+  )
+legend(
+  "topleft", 
+       legend=c("Cumulative cases pos. rate",
+                "Testing",
+                "lockdown started"
+                ),
+       col=c("black", "red", "purple"), 
+       lty=c(1, 1, 1),
+       lwd=c(2, 2, 2),
+       cex=0.6,
+       pch=c(18, 18, NA),
+       bty = "n",
+       pt.cex = c(1,1,1)
+)
+plot(
+  1:length(data_scaled), 
+  data_scaled,
+  type = "o",
+  col="black",
+  pch=18,
+  lwd=2,
+  lty=1,
+  cex=1,
+  xaxt="n",
+  xlab="",
+  ylab = "trending pendent", #  d(log(cases))/dt
+  ylim = c(0,max(data_scaled[!is.na(data_scaled)]))
+)
+polygon(pvaluesig_ind, p_value_area, col=c("#0C92C255","black"), border=1)
+axis(1, at = 1:length(data), labels =dates_resample[-1], las=2, cex.axis=0.7)
+points(
+  1:length(datatesting), 
+  datatesting*0.1,
+  type = "o",
+  col="red",
+  pch=18,
+  lwd=2,
+  lty=1,
+  cex=1,
+)
+# cbind(pvaluesig_ind, pvaluesig2_ind, p_value_area)
+plot(
+  cumulated,
+  type = "o",
+  col="orange",
+  pch=18,
+  lwd=2,
+  lty=1,
+  cex=1,
+  xaxt="n",
+  ylim = c(0,topval),
+  xlab = ""
+  )
+axis(1, at = 1:length(dates), labels =dates, las=2, cex.axis=0.7)
+```
+
+Blue areas are time periods where the p-value of the trending change resulted in significant results. pvalues (blue areas difference with the xaxis) are measured between 0 and 100. We usually accepr as significant p-value < 0.005 (0.5 in the chart).
