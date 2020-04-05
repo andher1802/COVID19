@@ -45,7 +45,7 @@ Analysis in trending changes is conducted using the causal analysis library. Mor
 Analysis is conducted over the discrete derivative of the logarithmic of the ratio between the cumulative confirmed cases vs. the total testing, as cases are exponentially distributed the log will result in the linear trend and the derivative will show the pendent. The time series will analyze increasing or decreasing trends on the pendent of the exponential growth rate.
 
 ```{r processing, include=TRUE, warning=FALSE}
-Country <- "Belgium" # Select the country
+Country <- "Korea, South" # Select the country
 ResultsByCountry <- result[[Country]] 
 CountryNamesList <- strsplit(as.character(testing$Entity), " - ")
 CountryName <- c()
@@ -54,7 +54,7 @@ for (element in CountryNamesList){
 }
 testing$Country <- CountryName
 
-TestByCountry <- testing[testing$Country == "Belgium",] # select country (pendent for creating a 
+TestByCountry <- testing[testing$Country == "South Korea",] # select country (pendent for creating a 
 TestByCountry$TestDate <- as.Date(TestByCountry$Date,format='%B %d, %Y')
 TestByCountry$DailyTest <- c(TestByCountry$Cumulative.total.tests[1],diff(TestByCountry$Cumulative.total.tests))
 
@@ -84,7 +84,7 @@ for(element in ResultsByCountry){
 
 testts <- ts(tests)
 if(is.na(testts[1])){
-  testts[1]=0
+  testts[1]=testts[!is.na(testts)][1]*.3
 }
 testtsint <- na.interpolation(testts)
 testtsint[testtsint==0]<-1
@@ -170,7 +170,9 @@ plot(
   ylim = c(0, topval),
   main = paste(Country, "Analysis of cumulative confirmed vs. cumulative testing", sep = " ")
 )
-polygon(pvaluesig_ind, p_value_area*10**10, col=c("#0C92C255","black"), border=1)
+x.poly <- c(pvaluesig_ind, pvaluesig_ind[length(pvaluesig_ind)], pvaluesig_ind[1])
+y.poly <- c(p_value_area, 0, 0)
+polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
 points(
   1:length(testtsint_resample), 
   cumsum(testtsint_resample)*(topval/max(cumsum(testtsint_resample))),
@@ -182,7 +184,7 @@ points(
   cex=1,
 )
 abline(
-  v=28,
+  v=17.5,
   col="purple",
   pch=18,
   lwd=2,
@@ -229,13 +231,13 @@ plot(
   xaxt="n",
   xlab="",
   ylab = "trending pendent", #  d(log(cases))/dt
-  ylim = c(0,max(data_scaled[!is.na(data_scaled)]))
+  ylim = c(min(data_scaled[!is.na(data_scaled)]),max(max(data_scaled[!is.na(data_scaled)]),max(datatesting[!is.na(datatesting)]*0.01)))
 )
-polygon(pvaluesig_ind, p_value_area, col=c("#0C92C255","black"), border=1)
+polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
 axis(1, at = 1:length(data), labels =dates_resample[-1], las=2, cex.axis=0.7)
 points(
   1:length(datatesting), 
-  datatesting*0.1,
+  datatesting*0.01,
   type = "o",
   col="red",
   pch=18,
