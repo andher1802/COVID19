@@ -56,6 +56,9 @@ for (element in CountryNamesList){
 }
 testing$Country <- CountryName
 
+# clipr::write_clip(rownames(as.matrix(table(testing$Country))))
+# clipr::write_clip(as.matrix(table(testing$Country)))
+
 TestByCountry <- testing[testing$Country == Country2,] # select country (pendent for creating a 
 TestByCountry$TestDate <- as.Date(TestByCountry$Date,format='%B %d, %Y')
 TestByCountry$DailyTest <- c(TestByCountry$Cumulative.total.tests[1],diff(TestByCountry$Cumulative.total.tests))
@@ -169,7 +172,7 @@ for (element in seq(startint, endint - 2 * interval, 1)){
     modelbest_ind[length(modelbest_ind)+1] <- impact$summary
   }
   pvaluesig_ind <- c(pvaluesig_ind, testperiod)
-  # pvaluesig_date <- c(pvaluesig_date, dates_resample[testperiod])
+  pvaluesig_date <- c(pvaluesig_date, as.character(dates_resample[testperiod]))
 }
 
 p_value_area <- c()
@@ -204,8 +207,17 @@ plot(
   main = paste(Country, "cumulative confirmed vs. cumulative testing", sep = " "),
   bty="n"
 )
-x.poly <- c(pvaluesig_ind, pvaluesig_ind[length(pvaluesig_ind)], pvaluesig_ind[1])
-y.poly <- c(p_value_area, 0, 0)
+
+
+scaled_area <- 100
+pvaluesig_ind.2 <- seq(pvaluesig_ind[1], pvaluesig_ind[length(pvaluesig_ind)] + 1 - (1/scaled_area), (1/scaled_area))
+p_value_area.2 <- c()
+for (element in p_value_area){
+  p_value_area.2 <- c(p_value_area.2, rep(element, scaled_area))
+}
+x.poly <- c(pvaluesig_ind.2, pvaluesig_ind.2[length(pvaluesig_ind.2)], pvaluesig_ind.2[1])
+y.poly <- c(p_value_area.2, 0, 0)
+
 polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
 points(
   1:length(testtsint_resample), 
@@ -265,7 +277,7 @@ plot(
   cex=1,
   xaxt="n",
   xlab="",
-  ylab = "trending pendent", #  d(log(cases))/dt
+  ylab = "trending growth rate", #  d2(log(cases))/dt2
   # ylim = c(min(data_scaled[!is.na(data_scaled)]),max(max(data_scaled[!is.na(data_scaled)]),max(datatesting[!is.na(datatesting)]*0.001)))
 )
 polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
