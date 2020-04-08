@@ -49,7 +49,6 @@ Analysis is conducted over the discrete derivative of the logarithmic of the rat
 countries_list <- c(
 "Austria",
 "Belgium",
-"Costa Rica",
 "Estonia",
 "Iceland",
 "Finland",
@@ -57,13 +56,9 @@ countries_list <- c(
 "Italy",
 "Japan",
 "Malaysia",
-"Pakistan",
-"Senegal",
 "South Africa",
 "South Korea",
-"Thailand",
-"United Kingdom",
-"Vietnam"
+"United Kingdom"
 )
 ```
 
@@ -392,7 +387,7 @@ Blue areas are time periods where the p-value of the trending change resulted in
 
 
 ```{r summary}
-date_analysis <- 14
+date_analysis <- 20
 Country
 modelbest_ind[date_analysis]
 modelbest_ind_report[date_analysis]
