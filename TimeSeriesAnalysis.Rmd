@@ -26,9 +26,9 @@ Data for Daily testing from [COVID19-TESTING](https://ourworldindata.org/covid-t
 Data for european measures can be found in [Report COVID19 Europe](https://www.imperial.ac.uk/media/imperial-college/medicine/mrc-gida/2020-03-30-COVID19-Report-13.pdf)
 
 ```{r load, include=FALSE}
-result <- fromJSON(file = "timeseries3.json") # data from the COVID19
-testing <- read.csv("covid19test2.csv", header = TRUE)
-testing_permillion <- read.csv("covid19test_permillion.csv", header = TRUE)
+result <- fromJSON(file = "timeseries4.json") # data from the COVID19
+testing <- read.csv("covid19test3.csv", header = TRUE)
+testing_permillion <- read.csv("covid19test_permillion2.csv", header = TRUE)
 ```
 
 ## Processing the data
@@ -44,6 +44,28 @@ Analysis in trending changes is conducted using the causal analysis library. Mor
 [Paper](https://projecteuclid.org/download/pdfview_1/euclid.aoas/1430226092)
 
 Analysis is conducted over the discrete derivative of the logarithmic of the ratio between the cumulative confirmed cases vs. the total testing, as cases are exponentially distributed the log will result in the linear trend and the derivative will show the pendent. The time series will analyze increasing or decreasing trends on the pendent of the exponential growth rate.
+
+```{r countries, include=FALSE, echo=FALSE}
+countries_list <- c(
+"Austria",
+"Belgium",
+"Costa Rica",
+"Estonia",
+"Iceland",
+"Finland",
+"France",
+"Italy",
+"Japan",
+"Malaysia",
+"Pakistan",
+"Senegal",
+"South Africa",
+"South Korea",
+"Thailand",
+"United Kingdom",
+"Vietnam"
+)
+```
 
 ```{r processing, include=TRUE, warning=FALSE}
 Country <- "Italy" # Select the country
@@ -125,8 +147,8 @@ analysis <- cumulated # Select between confirmed, recovered, deaths, cumulated
 
 CasesAdjusted <- analysis
 timeseries_Real_T <- ts(CasesAdjusted, start = 1, end = length(CasesAdjusted))
-n <- 2
-interval <- 3
+n <- 1
+interval <- 6
 
 dates_resample <- dates[seq(1, length(dates)-n, n)]
 timeseries_resample <- timeseries_Real_T[seq(1,length(timeseries_Real_T)-n, n)]
@@ -188,8 +210,13 @@ for (element in pvaluesig2_ind){
 ## Plotting results
 
 ```{r plot, include=TRUE}
+red <- 17
+blue <- 15
+yellow <- 11
+
 # topval <- max(timeseries_resample)
 topval <- 0.5
+scale <- 0.05
 # par(mfrow=c(3,1))
 plot(
   1:length(timeseries_resample), 
@@ -203,12 +230,10 @@ plot(
   xaxt="n",
   xlab="",
   ylab = "confirmed cases",
-  ylim = c(0, max(max(timeseries_resample),topval)),
+  ylim = c(0, max(max(timeseries_resample),topval+scale)),
   main = paste(Country, "cumulative confirmed vs. cumulative testing", sep = " "),
   bty="n"
 )
-
-
 scaled_area <- 100
 pvaluesig_ind.2 <- seq(pvaluesig_ind[1], pvaluesig_ind[length(pvaluesig_ind)] + 1 - (1/scaled_area), (1/scaled_area))
 p_value_area.2 <- c()
@@ -217,11 +242,10 @@ for (element in p_value_area){
 }
 x.poly <- c(pvaluesig_ind.2, pvaluesig_ind.2[length(pvaluesig_ind.2)], pvaluesig_ind.2[1])
 y.poly <- c(p_value_area.2, 0, 0)
-
 polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
 points(
-  1:length(testtsint_resample), 
-  testtsint_resample*(topval/max(testtsint_resample)),
+  1:length(testtsint_resample_pm), 
+  testtsint_resample_pm*(topval/max(testtsint_resample_pm)),
   type = "o",
   col="red",
   pch=18,
@@ -229,13 +253,40 @@ points(
   lty=1,
   cex=1,
 )
-# abline(
-#   v=17.5,
-#   col="purple",
-#   pch=18,
-#   lwd=2,
-#   lty=1
-# )
+
+#yellow - schools closure
+points(
+yellow,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="yellow",
+lwd=2,
+lty=1,
+)
+#blue - public events # 10=14-03-2020
+points(
+blue,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="blue",
+lwd=2,
+lty=1,
+)
+#red - lockdown
+points(
+red,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="red",
+lwd=2,
+lty=1,
+)
 axis(
   1, 
   at = 1:length(dates_resample), 
@@ -243,11 +294,11 @@ axis(
   las=2,
   cex.axis=0.7
   )
-scale <- 0.05
+
 axis(
   4, 
   at = seq(0,topval, scale), 
-  labels = round(seq(0,max(cumsum(testtsint_resample_pm)), max(cumsum(testtsint_resample_pm))/length(seq(0,topval, scale)))[1:length(seq(0,topval, scale))], 0), 
+  labels = round(seq(0,max(as.numeric(testtsint_resample_pm)), max(testtsint_resample_pm)/(length(seq(0,topval, scale))-1)), 2), 
   las=1,
   cex.axis=0.5,
   pos = length(dates_resample) + 0.5
@@ -255,16 +306,19 @@ axis(
 legend(
   "topleft", 
        legend=c("cases/testing",
-                "Testing per million (right axis)"
-                # "lockdown started"
+                "Testing per thousands (right axis)",
+                "School closure",
+                "Public events banned",
+                "lockdown"
                 ),
-       col=c("black", "red"), 
-       lty=c(1, 1),
-       lwd=c(2, 2),
+       col=c("black", "red", "black", "black", "black"), 
+       pt.bg=c(NA,NA,"yellow", "blue", "red"),
+       lty=c(1, 1, NA, NA, NA),
+       lwd=c(2, 2, 2, 2, 2),
        cex=0.6,
-       pch=c(18, 18),
+       pch=c(18, 18, 21, 21, 21),
        # bty = "n",
-       pt.cex = c(1,1)
+       pt.cex = 1
 )
 plot(
   1:length(data_scaled), 
@@ -280,18 +334,57 @@ plot(
   ylab = "trending growth rate", #  d2(log(cases))/dt2
   # ylim = c(min(data_scaled[!is.na(data_scaled)]),max(max(data_scaled[!is.na(data_scaled)]),max(datatesting[!is.na(datatesting)]*0.001)))
 )
+#yellow - schools closure
+points(
+yellow,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="yellow",
+lwd=2,
+lty=1,
+)
+#blue - public events # 10=14-03-2020
+points(
+blue,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="blue",
+lwd=2,
+lty=1,
+)
+#red - lockdown
+points(
+red,
+0,
+cex = 1,
+pch=21,  
+col = "black",
+bg="red",
+lwd=2,
+lty=1,
+)
 polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
 axis(1, at = 1:length(dates_resample), labels =dates_resample, las=2, cex.axis=0.7)
-# points(
-#   1:length(datatesting), 
-#   datatesting*0.01,
-#   type = "o",
-#   col="red",
-#   pch=18,
-#   lwd=2,
-#   lty=1,
-#   cex=1,
-# )
+legend(
+  "topleft", 
+       legend=c("Growth rate d2(Cases/testing)/dt2",
+                "School closure",
+                "Public events banned",
+                "lockdown"
+                ),
+       col=c("black", "black", "black", "black"), 
+       pt.bg=c(NA,"yellow", "blue", "red"),
+       lty=c(1, NA, NA, NA),
+       lwd=c(2, 2, 2, 2),
+       cex=0.6,
+       pch=c(18, 21, 21, 21),
+       # bty = "n",
+       pt.cex = 1
+)
 
 ```
 
@@ -299,9 +392,9 @@ Blue areas are time periods where the p-value of the trending change resulted in
 
 
 ```{r summary}
-date_analysis <- 19
+date_analysis <- 14
 Country
 modelbest_ind[date_analysis]
 modelbest_ind_report[date_analysis]
-dates_resample[date_analysis]
+pvaluesig_date[date_analysis]
 ```
