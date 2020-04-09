@@ -13,6 +13,7 @@ library(rjson)
 library(CausalImpact)
 library(TTR)
 library(imputeTS)
+library(rlist)
 setwd("~/Documents/Projects/Coronavirus/GITCOVID19/COVID19")
 graphics.off()
 ```
@@ -29,7 +30,10 @@ Data for european measures can be found in [Report COVID19 Europe](https://www.i
 result <- fromJSON(file = "timeseries4.json") # data from the COVID19
 testing <- read.csv("covid19test3.csv", header = TRUE)
 testing_permillion <- read.csv("covid19test_permillion2.csv", header = TRUE)
+US_Dataset_State <- fromJSON(file = "timeseriesus1.json")
 ```
+
+
 
 ## Processing the data
 
@@ -63,6 +67,28 @@ countries_list <- c(
 ```
 
 ```{r processing, include=TRUE, warning=FALSE}
+#### US Dataset ####
+OHList <- list.filter(US_Dataset_State, state == "OH")
+US_date <- c()
+US_cases <- c()
+US_test <- c()
+
+for (element in OHList){
+  dateustem <- as.character(element$date) 
+  year <- substr(dateustem, 1, 4)
+  month <- substr(dateustem, 5, 6)
+  day <- substr(dateustem, 7, 8)
+  US_date <- c(US_date, paste(year,month,day, sep = "-"))
+  US_cases <- c(US_cases, element$positive)
+  US_test <- c(US_test, element$positive+element$negative)
+} 
+
+US_date <- rev(US_date)
+US_cases <- rev(US_cases)
+US_test <- rev(US_test)
+
+####
+
 Country <- "Italy" # Select the country
 Country2 <- "Italy"
 ResultsByCountry <- result[[Country]] 
@@ -135,15 +161,21 @@ data_frame_analysis_temp$tests_pm_int <- na.kalman(data_frame_analysis_temp$test
 data_frame_analysis_complete <- data_frame_analysis_temp
 dates <- data_frame_analysis_complete$dates
 
-cumulated <- data_frame_analysis_complete$confirmed/data_frame_analysis_complete$tests_int # cumsum confirmed vs. cumsum testing
-analysis <- cumulated # Select between confirmed, recovered, deaths, cumulated
+data_frame_analysis_complete$cumulated <- data_frame_analysis_complete$confirmed/data_frame_analysis_complete$tests_int
+testing_analysis <- data_frame_analysis_complete$tests_int
+# cumsum confirmed vs. cumsum testing
+analysis <- data_frame_analysis_complete$cumulated # Select between confirmed, recovered, deaths, cumulated
 
-# Analysis is the rate of change of confirmed/testing (speed)
+#####
+# US ANALYSIS
+# analysis <- US_cases
+# dates <- US_date
+###
 
 CasesAdjusted <- analysis
 timeseries_Real_T <- ts(CasesAdjusted, start = 1, end = length(CasesAdjusted))
-n <- 1
-interval <- 6
+n <- 2
+interval <- 3
 
 dates_resample <- dates[seq(1, length(dates)-n, n)]
 timeseries_resample <- timeseries_Real_T[seq(1,length(timeseries_Real_T)-n, n)]
@@ -151,16 +183,26 @@ testtsint_resample <- data_frame_analysis_complete$tests_int[seq(1,length(data_f
 
 testtsint_resample_pm <- data_frame_analysis_complete$tests_pm_int[seq(1,length(data_frame_analysis_complete$tests_pm_int)-n, n)]
 
+#####
+# US_Sample
+# testtsint_resample_pm <- US_test
+####
+
 dataSMA <- timeseries_resample
-# dataSMA <- log(dataSMA)
-# dataSMA <- c(0,diff(dataSMA)) # Speed
-dataSMA <- c(0, c(0,diff(dataSMA))) # Accel
-data <- dataSMA
+pre_data <- dataSMA
+pre_data[pre_data==0] <- 0.01 
+log_dataSMA <- log(pre_data) # log
+first_dev_log_dataSMA <-c(0, diff(log_dataSMA)) # first dev log
+first_dev_dataSMA <- c(0,diff(dataSMA)) # Speed
+second_dev_dataSMA <- c(0,diff(first_dev_dataSMA)) # Accel
+data <- first_dev_log_dataSMA
 
 datatestingSMA <- testtsint_resample
-# datatestingSMA <- c(0,diff(datatestingSMA)) # Speed
-datatestingSMA <- c(0, c(0,diff(datatestingSMA))) # Accel
-datatesting <- datatestingSMA
+log_datatestingSMA <- log(datatestingSMA+0.001) # log
+first_dev_log_datatestingSMA <-c(0, diff(log_datatestingSMA)) # first dev log
+first_dev_datatestingSMA <- c(0,diff(datatestingSMA)) # Speed
+second_dev_datatestingSMA <- c(0,diff(first_dev_datatestingSMA)) # Accel
+datatesting <- first_dev_log_datatestingSMA
 
 data_scaled <- data
 
@@ -169,7 +211,7 @@ endint <- length(data_scaled)
 
 pvaluesig_ind <- c()
 pvaluesig2_ind <- c()
-modelbest_ind <- c()
+modelbest_ind <- vector(mode="list")
 modelbest_ind_report <- c()
 pvaluesig_date <- c()
 
@@ -177,16 +219,17 @@ for (element in seq(startint, endint - 2 * interval, 1)){
   testperiod <- element + interval
   pre.period <- c(testperiod-interval, testperiod)
   post.period <- c(testperiod+1, testperiod+1+interval)
+  t_name <- paste("mod",as.character(element))
   impact <- CausalImpact(data_scaled, pre.period, post.period)
   pvalue <- impact$summary$p[1]
   if(is.null(pvalue)){
     pvaluesig2_ind <- c(pvaluesig2_ind, 1)
     modelbest_ind_report[length(modelbest_ind_report)+1] <- NA
-    modelbest_ind[length(modelbest_ind)+1] <- NA
+    modelbest_ind[[t_name]] <- NA
   } else {
     pvaluesig2_ind <- c(pvaluesig2_ind, pvalue)
     modelbest_ind_report[length(modelbest_ind_report)+1] <- impact$report
-    modelbest_ind[length(modelbest_ind)+1] <- impact$summary
+    modelbest_ind[[t_name]] <- impact
   }
   pvaluesig_ind <- c(pvaluesig_ind, testperiod)
   pvaluesig_date <- c(pvaluesig_date, as.character(dates_resample[testperiod]))
@@ -205,9 +248,9 @@ for (element in pvaluesig2_ind){
 ## Plotting results
 
 ```{r plot, include=TRUE}
-red <- 17
-blue <- 15
-yellow <- 11
+red <- 9
+blue <- 8
+yellow <- 6
 
 # topval <- max(timeseries_resample)
 topval <- 0.5
@@ -226,7 +269,7 @@ plot(
   xlab="",
   ylab = "confirmed cases",
   ylim = c(0, max(max(timeseries_resample),topval+scale)),
-  main = paste(Country, "cumulative confirmed vs. cumulative testing", sep = " "),
+  main = paste(Country, "cumulative confirmed", sep = " "),
   bty="n"
 )
 scaled_area <- 100
@@ -237,9 +280,9 @@ for (element in p_value_area){
 }
 x.poly <- c(pvaluesig_ind.2, pvaluesig_ind.2[length(pvaluesig_ind.2)], pvaluesig_ind.2[1])
 y.poly <- c(p_value_area.2, 0, 0)
-polygon(x.poly, y.poly, col=c("#0C92C255"), border=1)
+polygon(x.poly, y.poly*5000, col=c("#0C92C255"), border=1)
 points(
-  1:length(testtsint_resample_pm), 
+  1:length(testtsint_resample_pm),
   testtsint_resample_pm*(topval/max(testtsint_resample_pm)),
   type = "o",
   col="red",
@@ -248,7 +291,6 @@ points(
   lty=1,
   cex=1,
 )
-
 #yellow - schools closure
 points(
 yellow,
@@ -291,9 +333,9 @@ axis(
   )
 
 axis(
-  4, 
-  at = seq(0,topval, scale), 
-  labels = round(seq(0,max(as.numeric(testtsint_resample_pm)), max(testtsint_resample_pm)/(length(seq(0,topval, scale))-1)), 2), 
+  4,
+  at = seq(0,topval, scale),
+  labels = round(seq(0,max(as.numeric(testtsint_resample_pm)), max(testtsint_resample_pm)/(length(seq(0,topval, scale))-1)), 2),
   las=1,
   cex.axis=0.5,
   pos = length(dates_resample) + 0.5
@@ -387,9 +429,12 @@ Blue areas are time periods where the p-value of the trending change resulted in
 
 
 ```{r summary}
-date_analysis <- 20
+date_analysis <- 11
+date_plot <- date_analysis
 Country
-modelbest_ind[date_analysis]
+summary(modelbest_ind[[paste("mod", date_plot)]])
 modelbest_ind_report[date_analysis]
 pvaluesig_date[date_analysis]
+
+plot(modelbest_ind[[paste("mod", date_plot)]])
 ```
