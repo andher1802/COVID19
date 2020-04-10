@@ -25,6 +25,8 @@ Data for Daily testing from [COVID19-TESTING](https://ourworldindata.org/covid-t
 [COVID19-TESTING-Sources](https://ourworldindata.org/covid-testing#source-information-country-by-country)
 
 Data for european measures can be found in [Report COVID19 Europe](https://www.imperial.ac.uk/media/imperial-college/medicine/mrc-gida/2020-03-30-COVID19-Report-13.pdf)
+ 
+US Data for COVID19 and Testing can be found in the covid tracking project [US COVID19](https://covidtracking.com/data/us-daily)
 
 ```{r load, include=FALSE}
 result <- fromJSON(file = "timeseries4.json") # data from the COVID19
@@ -267,9 +269,9 @@ plot(
   cex=1,
   xaxt="n",
   xlab="",
-  ylab = "confirmed cases",
+  ylab = "confirmed/testing (cumulated)",
   ylim = c(0, max(max(timeseries_resample),topval+scale)),
-  main = paste(Country, "cumulative confirmed", sep = " "),
+  main = paste(Country, "confirmed vs. testing", sep = " "),
   bty="n"
 )
 scaled_area <- 100
@@ -429,11 +431,11 @@ Blue areas are time periods where the p-value of the trending change resulted in
 
 
 ```{r summary}
-date_analysis <- 11
+date_analysis <- 10
 date_plot <- date_analysis
 Country
-summary(modelbest_ind[[paste("mod", date_plot)]])
-modelbest_ind_report[date_analysis]
+# summary(modelbest_ind[[paste("mod", date_plot)]])
+# modelbest_ind_report[date_analysis]
 pvaluesig_date[date_analysis]
 
 plot(modelbest_ind[[paste("mod", date_plot)]])
