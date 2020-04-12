@@ -5,7 +5,7 @@ date: "04/02/2020"
 output:
   html_document: default    
   word_document: default
-  pdf_document: default
+  pdf_document: default 
 ---
 
 ```{r setup, include=FALSE}
@@ -29,13 +29,11 @@ Data for european measures can be found in [Report COVID19 Europe](https://www.i
 US Data for COVID19 and Testing can be found in the covid tracking project [US COVID19](https://covidtracking.com/data/us-daily)
 
 ```{r load, include=FALSE}
-result <- fromJSON(file = "timeseries4.json") # data from the COVID19
-testing <- read.csv("covid19test3.csv", header = TRUE)
-testing_permillion <- read.csv("covid19test_permillion2.csv", header = TRUE)
+result <- fromJSON(file = "timeseries5.json") # data from the COVID19
+testing <- read.csv("covid19test4.csv", header = TRUE)
+testing_permillion <- read.csv("covid19test_permillion4.csv", header = TRUE)
 US_Dataset_State <- fromJSON(file = "timeseriesus1.json")
 ```
-
-
 
 ## Processing the data
 
@@ -93,6 +91,15 @@ US_test <- rev(US_test)
 
 Country <- "Italy" # Select the country
 Country2 <- "Italy"
+############### CHANGE THE INPUT OF ANALYSIS ############
+# "cumulated"
+# "tests_int"
+# "confirmed"
+name_analysis <- "cumulated"
+
+###############################
+
+
 ResultsByCountry <- result[[Country]] 
 CountryNamesList <- strsplit(as.character(testing$Entity), " - ")
 CountryName <- c()
@@ -165,8 +172,12 @@ dates <- data_frame_analysis_complete$dates
 
 data_frame_analysis_complete$cumulated <- data_frame_analysis_complete$confirmed/data_frame_analysis_complete$tests_int
 testing_analysis <- data_frame_analysis_complete$tests_int
-# cumsum confirmed vs. cumsum testing
-analysis <- data_frame_analysis_complete$cumulated # Select between confirmed, recovered, deaths, cumulated
+
+#############
+
+analysis <- data_frame_analysis_complete[[name_analysis]]
+
+#####################################
 
 #####
 # US ANALYSIS
@@ -222,7 +233,7 @@ for (element in seq(startint, endint - 2 * interval, 1)){
   pre.period <- c(testperiod-interval, testperiod)
   post.period <- c(testperiod+1, testperiod+1+interval)
   t_name <- paste("mod",as.character(element))
-  impact <- CausalImpact(data_scaled, pre.period, post.period)
+  impact <- CausalImpact(data_scaled, pre.period, post.period, model.args = list(niter = 5000, prior.level.sd = 0.4))
   pvalue <- impact$summary$p[1]
   if(is.null(pvalue)){
     pvaluesig2_ind <- c(pvaluesig2_ind, 1)
@@ -429,14 +440,37 @@ legend(
 
 Blue areas are time periods where the p-value of the trending change resulted in significant results. We usually accept as significant p-value < 0.005.
 
+## Writing the results
 
 ```{r summary}
-date_analysis <- 10
+date_analysis <- 12
 date_plot <- date_analysis
 Country
 # summary(modelbest_ind[[paste("mod", date_plot)]])
-# modelbest_ind_report[date_analysis]
+modelbest_ind_report[date_analysis]
 pvaluesig_date[date_analysis]
+csresults <- as.data.frame(cbind(as.character(pvaluesig_date), as.numeric(pvaluesig_ind), as.numeric(pvaluesig2_ind)))
+names(csresults) <- c("dates", "index", "p-values")
+csresults$dates <- as.Date(csresults$dates)
+fileout <- merge(data_frame_analysis_complete, csresults, by = "dates", all = TRUE)
+filename <- paste("./results/",Country, "_results.csv", sep = "")
+if (name_analysis == "cumulated"){
+# write.csv(fileout, file=filename, row.names = FALSE)  
+}
+# plot(modelbest_ind[[paste("mod", date_plot)]])
+```
 
-plot(modelbest_ind[[paste("mod", date_plot)]])
+```{r writeeffects}
+filename <- paste("_",pvaluesig_date[date_analysis], "_", Country, "_results", sep = "")
+filename_impact <- paste("./results/", name_analysis, filename, sep = "")
+model_selected <- modelbest_ind[[paste("mod", date_plot)]]
+datesnames <- as.character(dates_resample)
+test <- model_selected$summary
+test2 <- cbind(datesnames, model_selected$series)
+filename2 <- paste(filename_impact,"_eff.csv", sep = "")
+# write.csv(test, file=filename2)
+filename3 <- paste(filename_impact, "_series.csv", sep = "")
+# write.csv(test2, file=filename3)
+plot(model_selected)
+
 ```
