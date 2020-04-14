@@ -89,13 +89,13 @@ US_test <- rev(US_test)
 
 ####
 
-Country <- "Italy" # Select the country
-Country2 <- "Italy"
+Country <- "Korea, South" # Select the country
+Country2 <- "South Korea"
 ############### CHANGE THE INPUT OF ANALYSIS ############
 # "cumulated"
 # "tests_int"
 # "confirmed"
-name_analysis <- "cumulated"
+name_analysis <- "confirmed"
 
 ###############################
 
@@ -443,7 +443,7 @@ Blue areas are time periods where the p-value of the trending change resulted in
 ## Writing the results
 
 ```{r summary}
-date_analysis <- 12
+date_analysis <- 18
 date_plot <- date_analysis
 Country
 # summary(modelbest_ind[[paste("mod", date_plot)]])
@@ -468,9 +468,9 @@ datesnames <- as.character(dates_resample)
 test <- model_selected$summary
 test2 <- cbind(datesnames, model_selected$series)
 filename2 <- paste(filename_impact,"_eff.csv", sep = "")
-# write.csv(test, file=filename2)
+write.csv(test, file=filename2)
 filename3 <- paste(filename_impact, "_series.csv", sep = "")
-# write.csv(test2, file=filename3)
+write.csv(test2, file=filename3)
 plot(model_selected)
 
 ```
