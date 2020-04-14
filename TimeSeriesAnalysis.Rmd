@@ -474,3 +474,62 @@ write.csv(test2, file=filename3)
 plot(model_selected)
 
 ```
+
+``` {r readresults, include=TRUE}
+date <- "2020-03-29"
+country <- "United Kingdom"
+# type <- "cumulated"
+type <- "confirmed"
+
+filename <- paste(country,"_results.csv", sep = "")
+folder <- "./Summary/"
+folder2 <- paste("./",type,"_cases/",sep="")
+filename2 <- paste(type,"_", date, "_", country, "_results_series.csv", sep="")
+
+DataAnalysis <- read.csv(paste(folder,filename,sep = ""))
+# max(DataAnalysis$cumulated)
+dateeffect <- which(DataAnalysis$dates == date)
+startpre <- dateeffect - 6
+endpre <- dateeffect - 1
+startpos1 <- dateeffect
+endpos1 <- dateeffect + 6
+startpos6 <- dateeffect + 7
+endpos6 <- dateeffect + 12
+startpos12 <- dateeffect + 13
+
+avgpre <- mean(DataAnalysis[startpre:endpre,]$cumulated)
+avgpos1 <- mean(DataAnalysis[startpos1:endpos1,]$cumulated)
+avgpos6 <- mean(na.omit(DataAnalysis[startpos6:endpos6,]$cumulated))
+avgpos12 <- mean(na.omit(DataAnalysis[startpos12:length(DataAnalysis$dates),]$cumulated))
+
+DataAnalysis[startpre:endpre,]$dates
+DataAnalysis[startpos1:endpos1,]$dates
+DataAnalysis[startpos6:endpos6,]$dates
+# DataAnalysis[length(DataAnalysis$cumulated),]$dates
+
+mean(na.omit(DataAnalysis[startpos12:length(DataAnalysis$dates),]$cumulated))
+
+result <- cbind(max(DataAnalysis$cumulated), avgpre, avgpos1, avgpos6, avgpos12)
+clipboard <- function(x, sep="\t", row.names=FALSE, col.names=FALSE){
+  con <- pipe("xclip -selection clipboard -i", open="w")
+  write.table(x, con, sep=sep, row.names=row.names, col.names=col.names)
+  close(con)
+}
+result
+clipboard(result)
+
+ProjectionAnalysis <- read.csv(paste(folder2,filename2,sep = ""))
+firstdate <- ProjectionAnalysis[complete.cases(ProjectionAnalysis),]$datesnames
+date_compare <- firstdate[1]
+dateeffect <- which(as.character(DataAnalysis$dates) == as.character(date_compare))
+e0 <- DataAnalysis[dateeffect-2,]$cumulated
+
+ProjectionAnalysis$proj.response <- e0*exp(ProjectionAnalysis$cum.response)
+ProjectionAnalysis$proj.conterfactual <- e0*exp(ProjectionAnalysis$cum.pred)
+ProjectionAnalysis$proj.conterfactual.lower <- e0*exp(ProjectionAnalysis$cum.pred.lower)
+ProjectionAnalysis$proj.conterfactual.upper <- e0*exp(ProjectionAnalysis$cum.pred.upper)
+
+folder3 <- paste("./projected_",type,"/",sep="")
+filename3 <- paste(country, "_", date ,"_",type,"_proj.csv", sep = "")
+write.csv(ProjectionAnalysis, file=paste(folder3, filename3, sep=""))
+```
